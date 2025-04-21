@@ -1,0 +1,15 @@
+{
+  "name": "speech-grammar-app",
+  "version": "1.0.0",
+  "description": "Web app for speech-to-text, grammar correction, and text-to-speech using OpenAI",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "multer": "^1.4.5-lts.1",
+    "openai": "^4.2.1",
+    "dotenv": "^16.3.1"
+  }
+}
