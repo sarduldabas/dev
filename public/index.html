@@ -4,16 +4,91 @@
   <meta charset="UTF-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Speech Grammar Correction</title>
+  <title>Ellie – Your English Pal</title>
   <!-- Google Fonts -->
-  <link href="https://fonts.googleapis.com/css?family=Roboto:400,500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Pacifico&display=swap" rel="stylesheet">
   <!-- Custom Styles -->
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="container">
-    <h1>Speech Grammar Correction</h1>
-    <button id="recBtn" class="btn">Start Recording</button>
+    <!-- Avatar & Title -->
+    <div class="avatar-container">
+      <img id="avatar" class="avatar" src="/avatar.png" alt="Ellie avatar" />
+      <h1 class="title">Practice with Ellie</h1>
+    </div>
+    <!-- Scoreboard -->
+    <div class="scoreboard">
+      <div class="score-item card" data-type="tenses">
+        <p class="label">Tenses</p>
+        <p class="value"><span id="score-tenses">0</span> pts</p>
+      </div>
+      <div class="score-item card" data-type="preposition">
+        <p class="label">Prepositions</p>
+        <p class="value"><span id="score-preposition">0</span> pts</p>
+      </div>
+      <div class="score-item card" data-type="adverb">
+        <p class="label">Adverbs</p>
+        <p class="value"><span id="score-adverb">0</span> pts</p>
+      </div>
+      <div class="score-item card" data-type="adjective">
+        <p class="label">Adjectives</p>
+        <p class="value"><span id="score-adjective">0</span> pts</p>
+      </div>
+      <div class="score-item card" data-type="phrasal">
+        <p class="label">Phrasal Verbs</p>
+        <p class="value"><span id="score-phrasal">0</span> pts</p>
+      </div>
+      <div class="score-item bonus">
+        <p class="label">Bonus</p>
+        <p class="value"><span id="score-bonus">0</span> pts</p>
+      </div>
+      <div class="score-item total">
+        <p class="label">Total</p>
+        <p class="value"><span id="score-total">0</span> pts</p>
+      </div>
+    </div>
+    <!-- Exercise tabs with progress bars -->
+    <div class="tabs">
+      <div class="tab-container" data-type="tenses">
+        <button class="tab active" data-type="tenses">Tenses</button>
+        <div class="progress-bar"><div class="progress" id="progress-tenses"></div></div>
+      </div>
+      <div class="tab-container" data-type="preposition">
+        <button class="tab" data-type="preposition">Prepositions</button>
+        <div class="progress-bar"><div class="progress" id="progress-preposition"></div></div>
+      </div>
+      <div class="tab-container" data-type="adverb">
+        <button class="tab" data-type="adverb">Adverbs</button>
+        <div class="progress-bar"><div class="progress" id="progress-adverb"></div></div>
+      </div>
+      <div class="tab-container" data-type="adjective">
+        <button class="tab" data-type="adjective">Adjectives</button>
+        <div class="progress-bar"><div class="progress" id="progress-adjective"></div></div>
+      </div>
+      <div class="tab-container" data-type="phrasal">
+        <button class="tab" data-type="phrasal">Phrasal Verbs</button>
+        <div class="progress-bar"><div class="progress" id="progress-phrasal"></div></div>
+      </div>
+    </div>
+    <!-- Suggestion area -->
+    <p class="suggestion-container">
+      <span id="promptText">Use the preposition:</span>
+      <strong id="suggestion"></strong>
+      <button id="refreshBtn" class="btn small">Refresh</button>
+    </p>
+    <!-- Streak display -->
+    <div class="streak-container">
+      🔥 Streak: <span id="streak">0</span>
+    </div>
+    <!-- Action buttons -->
+    <button id="recBtn" class="btn">Say</button>
+    <button id="playBtn" class="btn" style="display:none; margin-left:0.5rem;">Play Again</button>
+    <!-- Loader -->
+    <div id="loader" class="loader" style="display:none;">
+      <div class="spinner"></div>
+      <p>Ellie is thinking...</p>
+    </div>
     <div class="results">
       <div class="result">
         <h2>You said</h2>
@@ -22,6 +97,15 @@
       <div class="result">
         <h2>Correction</h2>
         <p id="corr"></p>
+      </div>
+    </div>
+    <!-- Confetti container -->
+    <div id="confetti"></div>
+    <!-- Celebration Modal -->
+    <div id="celebrationModal" class="modal" style="display:none;">
+      <div class="modal-content">
+        <span id="closeModal" class="close-button">&times;</span>
+        <p>🎉 You unlocked Bonus Points! Great job!</p>
       </div>
     </div>
   </div>

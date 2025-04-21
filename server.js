@@ -10,6 +10,68 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.static(path.join(__dirname, 'public')));
+// Endpoint to suggest a random exercise item (preposition, adverb, adjective, phrasal verb)
+app.get('/api/exercise', async (req, res, next) => {
+  try {
+    const type = req.query.type;
+    // Tenses exercise: present → past conversion sentences
+    if (type === 'tenses') {
+      const tenseResp = await retryRequest(() =>
+        openai.chat.completions.create({
+          model: 'gpt-3.5-turbo',
+          messages: [
+            { role: 'system', content: 'You are a helpful English teacher. Provide a single short sentence in the present simple tense for a student to convert to the past simple tense. Respond with only the sentence, no quotes or extra text.' }
+          ],
+          temperature: 1.0,
+          max_tokens: 30,
+        })
+      );
+      let suggestion = tenseResp.choices[0].message.content.trim();
+      suggestion = suggestion.replace(/^['"]+|['"]+$/g, '');
+      return res.json({ suggestion });
+    }
+    // Default word-based exercises
+    const labelMap = { preposition: 'preposition', adverb: 'adverb', adjective: 'adjective', phrasal: 'phrasal verb' };
+    const label = labelMap[type] || type;
+    const exerciseResp = await retryRequest(() =>
+      openai.chat.completions.create({
+        model: 'gpt-3.5-turbo',
+        messages: [
+          { role: 'system', content: `You are a helpful English teacher. Provide a single random English ${label} (no quotes or extra text).` }
+        ],
+        temperature: 1.0,
+        max_tokens: 5,
+      })
+    );
+    let suggestion = exerciseResp.choices[0].message.content.trim();
+    suggestion = suggestion.replace(/^['"]+|['"]+$/g, '');
+    res.json({ suggestion });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Endpoint to suggest a random preposition
+app.get('/api/preposition', async (req, res, next) => {
+  try {
+    const prepositionResp = await retryRequest(() =>
+      openai.chat.completions.create({
+        model: 'gpt-3.5-turbo',  // faster model for preposition suggestions
+        messages: [
+          { role: 'system', content: 'You are a helpful English teacher. Provide a single random English preposition (e.g., under, above, between) without quotes or extra text.' }
+        ],
+        temperature: 1.0,
+        max_tokens: 3,
+      })
+    );
+    let prep = prepositionResp.choices[0].message.content.trim();
+    // strip surrounding quotes if any
+    prep = prep.replace(/^['"]+|['"]+$/g, '');
+    res.json({ preposition: prep });
+  } catch (err) {
+    next(err);
+  }
+});
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -56,26 +118,56 @@ app.post('/api/process', upload.single('audio'), async (req, res, next) => {
     );
     const userText = transcription.text.trim();
 
-    // Grammar correction with retry on rate limits
+    // Dynamic exercise-specific correction or conversion
+    const suggestion = req.body.suggestion;
+    const type = req.body.type;
+    let systemPrompt;
+    if (type === 'tenses') {
+      // Tenses exercise: present simple to past simple conversion
+      systemPrompt = 'You are a native American English speaker named Ellie. You are young, cheerful, helpful, and kind. ' +
+        `The exercise is to convert the following present simple sentence to past simple tense: "${suggestion}". ` +
+        'Please check if the user\'s response is a correct conversion; if incorrect, provide the correct past simple sentence. ' +
+        'Provide feedback and examples as a friend.';
+    } else {
+      // Default word-based grammar correction
+      const labelMap = { preposition: 'preposition', adverb: 'adverb', adjective: 'adjective', phrasal: 'phrasal verb' };
+      const label = labelMap[type] || type;
+      systemPrompt = 'You are a native American English speaker named Ellie. You are young, cheerful, helpful, and kind. ' +
+        'You are here to converse with a non-native speaker and help correct any grammatical error and teach correct usage as a friend.';
+      if (suggestion) {
+        systemPrompt += ` The current exercise is to use the ${label} "${suggestion}". ` +
+          `Please correct the user's sentence, comment on whether they used the ${label} correctly, and provide feedback and examples as a friend.`;
+      }
+    }
+    // Instruct model to append usage correctness marker
+    systemPrompt += ' After providing feedback and examples, append two newline characters then "USAGE_CORRECT: yes" or "USAGE_CORRECT: no" indicating if the exercise usage was correct.';
     const chatCompletion = await retryRequest(() =>
       openai.chat.completions.create({
-        model: 'gpt-4',
+        model: 'gpt-3.5-turbo',  // faster model for grammar correction
         messages: [
-          { role: 'system', content: 'You are a helpful English teacher. Correct grammar and style.' },
+          { role: 'system', content: systemPrompt },
           { role: 'user', content: userText },
         ],
         temperature: 0.2,
       })
     );
-    const corrected = chatCompletion.choices[0].message.content.trim();
+    // Parse GPT response and extract usage correctness flag
+    const fullResponse = chatCompletion.choices[0].message.content.trim();
+    const parts = fullResponse.split(/\n\n?USAGE_CORRECT:/i);
+    const corrected = parts[0].trim();
+    let usageCorrect = false;
+    if (parts[1]) {
+      usageCorrect = parts[1].trim().toLowerCase().startsWith('yes');
+    }
 
-    // Text-to-speech with retry on rate limits
+    // Text-to-speech with retry on rate limits using GPT-4o Mini TTS
     const ttsResponse = await retryRequest(() =>
       openai.audio.speech.create({
-        model: 'tts-1',
-        voice: 'alloy',
+        model: 'gpt-4o-mini-tts',          // GPT-4o Mini TTS model
+        voice: 'fable',                    // cheerful girl voice
+        instructions: 'Speak in a cheerful, friendly young girl tone.',
         input: corrected,
-        format: 'wav',
+        response_format: 'wav',            // return audio as WAV
       })
     );
     // Handle binary audio response (ArrayBuffer, Buffer, or fetch Response)
@@ -96,7 +188,7 @@ app.post('/api/process', upload.single('audio'), async (req, res, next) => {
       if (err) console.error('Failed to delete temp file:', err);
     });
 
-    res.json({ original: userText, corrected, audio: base64Audio, mime: 'audio/wav' });
+    res.json({ original: userText, corrected, audio: base64Audio, mime: 'audio/wav', usageCorrect });
   } catch (error) {
     next(error);
   }
