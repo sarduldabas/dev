@@ -33,8 +33,8 @@
  ## Installation & Setup
  1. **Clone the repository**:
     ```bash
-    git clone <repo_url>
-    cd speech-grammar-app
+    git clone https://github.com/sarduldabas/dev.git
+    cd dev  # or the cloned repository directory
     ```
  2. **Install dependencies**:
     ```bash
@@ -46,8 +46,10 @@
     OPENAI_API_KEY=your_api_key_here
     PORT=3000           # optional
     ```
- 4. **Run the server**:
+ 4. **Start the server**:
     ```bash
+    npm start        # uses "node server.js"
+    # or
     node server.js
     ```
  5. **Open in browser** at `http://localhost:3000` to begin practicing with Ellie.
