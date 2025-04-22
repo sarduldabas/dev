@@ -12,6 +12,15 @@
 </head>
 <body>
   <div class="container">
+      <!-- Main Navigation -->
+      <div class="nav-bar">
+        <button class="nav-tab active" data-screen="practice">Practice</button>
+        <button class="nav-tab" data-screen="translate">Translate</button>
+        <button class="nav-tab" data-screen="admin">Progress</button>
+        <button class="nav-tab" data-screen="articles">Articles</button>
+      </div>
+      <!-- Practice Screen -->
+      <div id="practice-screen" class="screen">
     <!-- Avatar & Title -->
     <div class="avatar-container">
       <img id="avatar" class="avatar" src="/avatar.png" alt="Ellie avatar" />
@@ -101,6 +110,41 @@
         <p id="corr"></p>
       </div>
     </div>
+      </div> <!-- end practice-screen -->
+      <!-- Translate Screen -->
+      <div id="translate-screen" class="screen" style="display:none">
+        <h2>Translate to English</h2>
+        <button id="translateRecBtn" class="btn">Start Speaking</button>
+        <div id="translateLoader" class="loader" style="display:none;">
+          <div class="spinner"></div>
+          <p>Ellie is translating...</p>
+        </div>
+        <div class="result">
+          <h2>Translation</h2>
+          <p id="translation"></p>
+        </div>
+      </div>
+      <!-- Admin/Progress Screen -->
+      <div id="admin-screen" class="screen" style="display:none">
+        <h2>Progress & Usage</h2>
+        <div class="scoreboard" id="admin-stats"></div>
+      </div>
+      <!-- Articles Screen -->
+      <div id="articles-screen" class="screen" style="display:none">
+        <h2>Articles</h2>
+        <section>
+          <h3>The Philosophy Behind This App</h3>
+          <p>Our mission is to make language practice as natural and engaging as conversation with a friend...</p>
+        </section>
+        <section>
+          <h3>How to Use It</h3>
+          <p>Navigate to the Practice tab to train your grammar, use Translate to get speech translations...</p>
+        </section>
+        <section>
+          <h3>Key Benefits</h3>
+          <p>Build confidence in speaking, get instant feedback, track progress, and learn at your own pace...</p>
+        </section>
+      </div>
     <!-- Confetti container -->
     <div id="confetti"></div>
     <!-- Celebration Modal -->

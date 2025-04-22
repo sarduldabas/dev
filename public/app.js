@@ -9,6 +9,14 @@ const recBtn = document.getElementById('recBtn');
 const origEl = document.getElementById('orig');
 const corrEl = document.getElementById('corr');
 const playBtn = document.getElementById('playBtn');
+// Main navigation tabs and screens
+const navTabs = document.querySelectorAll('.nav-tab');
+const screens = document.querySelectorAll('.screen');
+// Translate screen elements
+const translateRecBtn = document.getElementById('translateRecBtn');
+const translateLoader = document.getElementById('translateLoader');
+const translationEl = document.getElementById('translation');
+let translateMediaRecorder, translateAudioChunks;
 // Waveform canvas for live audio
 const waveform = document.getElementById('waveform');
 // Speech recognition and waveform variables
@@ -252,6 +260,80 @@ playBtn.addEventListener('click', () => {
     lastAudioEl.play();
   }
 });
+// ---------------------------------------------
+// Additional screens and navigation
+// Handle main navigation between screens
+navTabs.forEach(tab => {
+  tab.addEventListener('click', () => {
+    navTabs.forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    screens.forEach(s => s.style.display = 'none');
+    const screenId = `${tab.dataset.screen}-screen`;
+    const screenEl = document.getElementById(screenId);
+    if (screenEl) screenEl.style.display = 'block';
+    if (screenId === 'admin-screen') renderAdminStats();
+  });
+});
+// Translate screen: record and translate audio
+if (translateRecBtn) {
+  translateRecBtn.addEventListener('click', async () => {
+    if (translateMediaRecorder && translateMediaRecorder.state === 'recording') {
+      translateMediaRecorder.stop();
+      translateRecBtn.textContent = 'Start Speaking';
+      translateRecBtn.disabled = true;
+      translateLoader.style.display = 'flex';
+    } else {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      translateMediaRecorder = new MediaRecorder(stream);
+      translateAudioChunks = [];
+      translateMediaRecorder.ondataavailable = e => translateAudioChunks.push(e.data);
+      translateMediaRecorder.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        translateLoader.style.display = 'none';
+        translateRecBtn.disabled = false;
+        const blob = new Blob(translateAudioChunks, { type: 'audio/webm' });
+        const form = new FormData();
+        form.append('audio', blob, 'speech.webm');
+        try {
+          const resp = await fetch('/api/translate', { method: 'POST', body: form });
+          if (!resp.ok) throw new Error((await resp.json()).error || `Status ${resp.status}`);
+          const { translation } = await resp.json();
+          translationEl.textContent = translation;
+        } catch (err) {
+          console.error(err);
+          alert(err.message);
+        }
+      };
+      translateMediaRecorder.start();
+      translateRecBtn.textContent = 'Stop';
+    }
+  });
+}
+// Render admin/progress stats
+function renderAdminStats() {
+  const adminStatsEl = document.getElementById('admin-stats');
+  if (!adminStatsEl) return;
+  adminStatsEl.innerHTML = '';
+  ['tenses','preposition','adverb','adjective','phrasal'].forEach(type => {
+    const s = stats[type];
+    const card = document.createElement('div');
+    card.className = 'score-item';
+    card.innerHTML = `
+      <p class="label">${type.charAt(0).toUpperCase() + type.slice(1)}</p>
+      <p>Attempts: ${s.attempts}</p>
+      <p>Points: ${s.points}</p>
+      <p>Streak: ${s.streak}</p>`;
+    adminStatsEl.appendChild(card);
+  });
+  if (stats.bonusAwarded) {
+    const bonusCard = document.createElement('div');
+    bonusCard.className = 'score-item';
+    bonusCard.innerHTML = `
+      <p class="label">Bonus</p>
+      <p>Points: ${stats.bonusPoints}</p>`;
+    adminStatsEl.appendChild(bonusCard);
+  }
+}
 
 let mediaRecorder;
 let audioChunks = [];

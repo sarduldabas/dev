@@ -181,9 +181,30 @@ app.post('/api/process', upload.single('audio'), async (req, res, next) => {
     const ttsBuffer = Buffer.from(ttsArray);
     const base64Audio = ttsBuffer.toString('base64');
     // Return original, corrected, audio and usage flag
-    res.json({ original: userText, corrected, audio: base64Audio, mime: 'audio/wav', usageCorrect });
+  res.json({ original: userText, corrected, audio: base64Audio, mime: 'audio/wav', usageCorrect });
   } catch (error) {
     next(error);
+  }
+});
+// Endpoint for translating spoken audio into English
+app.post('/api/translate', upload.single('audio'), async (req, res, next) => {
+  try {
+    // Ensure uploaded file has an extension
+    let audioPath = req.file.path;
+    const ext = path.extname(req.file.originalname || '');
+    if (ext) {
+      try { fs.renameSync(audioPath, audioPath + ext); audioPath += ext; } catch {};
+    }
+    // Audio translation: use GPT-4o translate model
+    const translationResp = await retryRequest(() =>
+      openai.audio.translations.create({ file: fs.createReadStream(audioPath), model: 'gpt-4o-translate' })
+    );
+    const translation = translationResp.text.trim();
+    // Cleanup
+    fs.unlink(audioPath, () => {});
+    res.json({ translation });
+  } catch (err) {
+    next(err);
   }
 });
 
