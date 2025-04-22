@@ -260,6 +260,114 @@ playBtn.addEventListener('click', () => {
     lastAudioEl.play();
   }
 });
+// Practice recording and processing
+let mediaRecorder;
+let audioChunks = [];
+recBtn.addEventListener('click', async () => {
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    // Stop recording and begin processing
+    mediaRecorder.stop();
+    recBtn.textContent = 'Start Practising';
+    // Hide play button and show loader
+    playBtn.style.display = 'none';
+    loader.style.display = 'flex';
+    // Disable buttons during processing
+    recBtn.disabled = true;
+    refreshBtn.disabled = true;
+  } else {
+    // Start recording
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    // Show waveform and start analyser
+    audioContext = new AudioContext();
+    audioSource = audioContext.createMediaStreamSource(stream);
+    analyser = audioContext.createAnalyser();
+    audioSource.connect(analyser);
+    analyser.fftSize = 2048;
+    bufferLength = analyser.fftSize;
+    dataArray = new Uint8Array(bufferLength);
+    waveform.style.display = 'block';
+    drawWaveform();
+    // Start speech recognition for real-time transcription
+    if (window.SpeechRecognition || window.webkitSpeechRecognition) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognition = new SpeechRecognition();
+      recognition.interimResults = true;
+      recognition.continuous = true;
+      recognition.lang = 'en-US';
+      recognition.onresult = (event) => {
+        let interim = '';
+        let final = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) final += transcript;
+          else interim += transcript;
+        }
+        origEl.textContent = final + interim;
+      };
+      recognition.start();
+    }
+    mediaRecorder = new MediaRecorder(stream);
+    audioChunks = [];
+
+    mediaRecorder.ondataavailable = (e) => {
+      audioChunks.push(e.data);
+    };
+
+    mediaRecorder.onstop = async () => {
+      // Stop real-time transcription and waveform display
+      if (recognition) recognition.stop();
+      if (animationId) cancelAnimationFrame(animationId);
+      if (audioContext) audioContext.close();
+      waveform.style.display = 'none';
+      const blob = new Blob(audioChunks, { type: 'audio/webm' });
+      const form = new FormData();
+      form.append('audio', blob, 'speech.webm');
+      // include exercise type and suggestion for context
+      form.append('type', currentType);
+      form.append('suggestion', currentSuggestion);
+
+      try {
+        // Get feedback, TTS audio and update UI
+        const resp = await fetch('/api/process', { method: 'POST', body: form });
+        if (!resp.ok) throw new Error((await resp.json()).error || `Status ${resp.status}`);
+        const { original, corrected, usageCorrect, audio: base64Audio, mime } = await resp.json();
+        // Display text results
+        origEl.textContent = original;
+        corrEl.textContent = corrected;
+        animateAvatar(usageCorrect);
+        // Update scoring
+        const tabStats = stats[currentType];
+        if (tabStats.attempts < 10) { tabStats.attempts++; tabStats.points = Math.min(50, tabStats.points + 5); }
+        if (usageCorrect) tabStats.streak++; else tabStats.streak = 0;
+        if (usageCorrect && tabStats.streak >= 5 && !tabStats.milestone5) { tabStats.points += 10; tabStats.milestone5 = true; }
+        if (usageCorrect && tabStats.streak >= 10 && !tabStats.milestone10) { tabStats.points += 20; tabStats.milestone10 = true; }
+        if (!stats.bonusAwarded && ['tenses','preposition','adverb','adjective','phrasal'].every(t => stats[t].points >= 50)) {
+          stats.bonusAwarded = true; stats.bonusPoints = 50;
+          showConfetti(); showCelebrationModal();
+        }
+        localStorage.setItem('ellieStats', JSON.stringify(stats));
+        updateScoreboard(); updateProgressBars(); updateStreak();
+        // Hide loader and re-enable buttons
+        loader.style.display = 'none'; recBtn.disabled = false; refreshBtn.disabled = false;
+        // Play TTS audio from base64 response
+        const binary = atob(base64Audio);
+        const buffer = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) buffer[i] = binary.charCodeAt(i);
+        const ttsBlob = new Blob([buffer], { type: mime });
+        const ttsUrl = URL.createObjectURL(ttsBlob);
+        const audioEl = new Audio(ttsUrl);
+        audioEl.play().catch(console.error);
+        lastAudioEl = audioEl;
+        playBtn.style.display = 'inline-block';
+      } catch (error) {
+        console.error(error); alert(error.message);
+        loader.style.display = 'none'; recBtn.disabled = false; refreshBtn.disabled = false;
+      }
+    };
+    mediaRecorder.start();
+    recBtn.textContent = 'Stop';
+  }
+});
 // ---------------------------------------------
 // Additional screens and navigation
 // Handle main navigation between screens
