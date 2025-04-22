@@ -14,13 +14,18 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.get('/api/exercise', async (req, res, next) => {
   try {
     const type = req.query.type;
-    // Tenses exercise: present → past conversion sentences
+    // Tenses exercise: random source → target tense conversion sentences
     if (type === 'tenses') {
+      const allTenses = ['present simple', 'past simple', 'present continuous', 'past continuous', 'future simple', 'future continuous'];
+      const source = allTenses[Math.floor(Math.random() * allTenses.length)];
+      const targets = allTenses.filter(t => t !== source);
+      const target = targets[Math.floor(Math.random() * targets.length)];
+      // Generate a single short sentence in the source tense
       const tenseResp = await retryRequest(() =>
         openai.chat.completions.create({
           model: 'gpt-3.5-turbo',
           messages: [
-            { role: 'system', content: 'You are a helpful English teacher. Provide a single short sentence in the present simple tense for a student to convert to the past simple tense. Respond with only the sentence, no quotes or extra text.' }
+            { role: 'system', content: `You are a helpful English teacher. Provide a single short sentence in the ${source} tense. Respond with only the sentence, no quotes or extra text.` }
           ],
           temperature: 1.0,
           max_tokens: 30,
@@ -28,7 +33,7 @@ app.get('/api/exercise', async (req, res, next) => {
       );
       let suggestion = tenseResp.choices[0].message.content.trim();
       suggestion = suggestion.replace(/^['"]+|['"]+$/g, '');
-      return res.json({ suggestion });
+      return res.json({ suggestion, source, target });
     }
     // Default word-based exercises
     const labelMap = { preposition: 'preposition', adverb: 'adverb', adjective: 'adjective', phrasal: 'phrasal verb' };
@@ -109,11 +114,11 @@ app.post('/api/process', upload.single('audio'), async (req, res, next) => {
         console.warn('Could not rename file to include extension, proceeding with original path:', renameErr);
       }
     }
-    // Speech-to-text with retry on rate limits; recreate stream on each attempt
+    // Speech-to-text with retry on rate limits; use GPT-4o transcription model
     const transcription = await retryRequest(() =>
       openai.audio.transcriptions.create({
         file: fs.createReadStream(audioPath),
-        model: 'whisper-1',
+        model: 'gpt-4o-transcribe',
       })
     );
     const userText = transcription.text.trim();
@@ -124,7 +129,7 @@ app.post('/api/process', upload.single('audio'), async (req, res, next) => {
     let systemPrompt;
     if (type === 'tenses') {
       // Tenses exercise: present simple to past simple conversion
-      systemPrompt = 'You are a native American English speaker named Ellie. You are young, cheerful, helpful, and kind. ' +
+      systemPrompt = 'You are a native American English speaker named Ellie. You are young, cheerful, helpful, and kind. Begin with a friendly greeting (e.g., "Hey there!"), and maintain a natural conversational tone. ' +
         `The exercise is to convert the following present simple sentence to past simple tense: "${suggestion}". ` +
         'Please check if the user\'s response is a correct conversion; if incorrect, provide the correct past simple sentence. ' +
         'Provide feedback and examples as a friend.';
@@ -132,7 +137,7 @@ app.post('/api/process', upload.single('audio'), async (req, res, next) => {
       // Default word-based grammar correction
       const labelMap = { preposition: 'preposition', adverb: 'adverb', adjective: 'adjective', phrasal: 'phrasal verb' };
       const label = labelMap[type] || type;
-      systemPrompt = 'You are a native American English speaker named Ellie. You are young, cheerful, helpful, and kind. ' +
+      systemPrompt = 'You are a native American English speaker named Ellie. You are young, cheerful, helpful, and kind. Begin with a friendly greeting (e.g., "Hey there!"), and maintain a natural conversational tone. ' +
         'You are here to converse with a non-native speaker and help correct any grammatical error and teach correct usage as a friend.';
       if (suggestion) {
         systemPrompt += ` The current exercise is to use the ${label} "${suggestion}". ` +
@@ -160,39 +165,91 @@ app.post('/api/process', upload.single('audio'), async (req, res, next) => {
       usageCorrect = parts[1].trim().toLowerCase().startsWith('yes');
     }
 
-    // Text-to-speech with retry on rate limits using GPT-4o Mini TTS
-    const ttsResponse = await retryRequest(() =>
+    // Cleanup temporary file
+    fs.unlink(audioPath, () => {});
+    // Generate TTS audio using GPT-4o Mini TTS and convert to base64
+    const ttsResp = await retryRequest(() =>
       openai.audio.speech.create({
-        model: 'gpt-4o-mini-tts',          // GPT-4o Mini TTS model
-        voice: 'fable',                    // cheerful girl voice
-        instructions: 'Speak in a cheerful, friendly young girl tone.',
+        model: 'gpt-4o-mini-tts',
+        voice: 'sage',
+        instructions: `Affect/personality: A cheerful guide Tone: Friendly, clear, and reassuring, creating a calm atmosphere and making the listener feel confident and comfortable. Pronunciation: Clear, articulate, and steady, ensuring each instruction is easily understood while maintaining a natural, conversational flow. Pause: Brief, purposeful pauses after key instructions (e.g., "cross the street" and "turn right") to allow time for the listener to process the information and follow along. Emotion: Warm and supportive, conveying empathy and care, ensuring the listener feels guided and safe throughout the journey.`,
         input: corrected,
-        response_format: 'wav',            // return audio as WAV
+        response_format: 'wav',
       })
     );
-    // Handle binary audio response (ArrayBuffer, Buffer, or fetch Response)
-    let rawAudio;
-    if (Buffer.isBuffer(ttsResponse)) {
-      rawAudio = ttsResponse;
-    } else if (typeof ttsResponse.arrayBuffer === 'function') {
-      rawAudio = Buffer.from(await ttsResponse.arrayBuffer());
-    } else if (ttsResponse.data) {
-      rawAudio = Buffer.from(ttsResponse.data);
-    } else {
-      rawAudio = Buffer.from(ttsResponse);
-    }
-    const base64Audio = rawAudio.toString('base64');
-
-    // Cleanup temporary file
-    fs.unlink(audioPath, (err) => {
-      if (err) console.error('Failed to delete temp file:', err);
-    });
-
+    const ttsArray = await ttsResp.arrayBuffer();
+    const ttsBuffer = Buffer.from(ttsArray);
+    const base64Audio = ttsBuffer.toString('base64');
+    // Return original, corrected, audio and usage flag
     res.json({ original: userText, corrected, audio: base64Audio, mime: 'audio/wav', usageCorrect });
   } catch (error) {
     next(error);
   }
 });
+
+// Endpoint for streaming TTS audio response: transcribe, correct, and stream TTS
+// Endpoint for streaming TTS audio response: transcribe, correct, and return audio for playback
+app.post('/api/process-stream', upload.single('audio'), async (req, res, next) => {
+  try {
+    // Ensure uploaded file has an extension for transcription
+    let audioPath = req.file.path;
+    const originalName = req.file.originalname || '';
+    const ext = path.extname(originalName);
+    if (ext) {
+      try { fs.renameSync(audioPath, audioPath + ext); audioPath += ext; } catch {};
+    }
+    // Speech-to-text
+    const transcription = await retryRequest(() =>
+      openai.audio.transcriptions.create({ file: fs.createReadStream(audioPath), model: 'gpt-4o-transcribe' })
+    );
+    const userText = transcription.text.trim();
+    // Build system prompt
+    const suggestion = req.body.suggestion;
+    const type = req.body.type;
+    let systemPrompt = '';
+    if (type === 'tenses') {
+      systemPrompt = 'You are a native American English speaker named Ellie. You are young, cheerful, helpful, and kind. Begin with a friendly greeting (e.g., "Hey there!"), and maintain a natural conversational tone. ' +
+        `The exercise is to convert the following present simple sentence to past simple tense: "${suggestion}". ` +
+        'Please check if the user\'s response is a correct conversion; if incorrect, provide the correct past simple sentence. ' +
+        'Provide feedback and examples as a friend.';
+    } else {
+      systemPrompt = 'You are a native American English speaker named Ellie. You are young, cheerful, helpful, and kind. Begin with a friendly greeting (e.g., "Hey there!"), and maintain a natural conversational tone. ' +
+        'You are here to converse with a non-native speaker and help correct any grammatical error and teach correct usage as a friend.';
+      if (suggestion) {
+        const labelMap = { preposition: 'preposition', adverb: 'adverb', adjective: 'adjective', phrasal: 'phrasal verb' };
+        const label = labelMap[type] || type;
+        systemPrompt += ` The current exercise is to use the ${label} "${suggestion}". ` +
+          `Please correct the user's sentence, comment on whether they used the ${label} correctly, and provide feedback and examples as a friend.`;
+      }
+    }
+    systemPrompt += ' After providing feedback and examples, append two newline characters then "USAGE_CORRECT: yes" or "USAGE_CORRECT: no" indicating if the exercise usage was correct.';
+    // Grammar correction
+    const chatResp = await retryRequest(() =>
+      openai.chat.completions.create({ model: 'gpt-3.5-turbo', messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userText }], temperature: 0.2 })
+    );
+    const fullResponse = chatResp.choices[0].message.content.trim();
+    const parts = fullResponse.split(/\n\n?USAGE_CORRECT:/i);
+    const corrected = parts[0].trim();
+    // Cleanup
+    fs.unlink(audioPath, () => {});
+    // Generate TTS audio
+    const ttsResp = await retryRequest(() =>
+      openai.audio.speech.create({
+        model: 'gpt-4o-mini-tts', voice: 'sage',
+        instructions: `Affect/personality: A cheerful guide Tone: Friendly, clear, and reassuring, creating a calm atmosphere and making the listener feel confident and comfortable. Pronunciation: Clear, articulate, and steady, ensuring each instruction is easily understood while maintaining a natural, conversational flow. Pause: Brief, purposeful pauses after key instructions (e.g., "cross the street" and "turn right") to allow time for the listener to process the information and follow along. Emotion: Warm and supportive, conveying empathy and care, ensuring the listener feels guided and safe throughout the journey.`,
+        input: corrected, response_format: 'wav'
+      })
+    );
+    // Return binary audio for MSE playback
+    const arrayBuffer = await ttsResp.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    res.setHeader('Content-Type', 'audio/wav');
+    res.send(buffer);
+  } catch (err) {
+    next(err);
+  }
+});
+
 
 // Global error handler: handle rate limit explicitly
 app.use((err, req, res, next) => {
