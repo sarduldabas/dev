@@ -127,23 +127,30 @@
       <!-- Admin/Progress Screen -->
       <div id="admin-screen" class="screen" style="display:none">
         <h2>Progress & Usage</h2>
+        <div class="kpi-filters">
+          <button class="kpi-filter active" data-range="day">Today</button>
+          <button class="kpi-filter" data-range="week">This Week</button>
+          <button class="kpi-filter" data-range="month">This Month</button>
+        </div>
         <div class="scoreboard" id="admin-stats"></div>
       </div>
       <!-- Articles Screen -->
       <div id="articles-screen" class="screen" style="display:none">
         <h2>Articles</h2>
-        <section>
-          <h3>The Philosophy Behind This App</h3>
-          <p>Our mission is to make language practice as natural and engaging as conversation with a friend...</p>
-        </section>
-        <section>
-          <h3>How to Use It</h3>
-          <p>Navigate to the Practice tab to train your grammar, use Translate to get speech translations...</p>
-        </section>
-        <section>
-          <h3>Key Benefits</h3>
-          <p>Build confidence in speaking, get instant feedback, track progress, and learn at your own pace...</p>
-        </section>
+        <div class="articles-container">
+          <aside class="articles-nav">
+            <ul id="articles-nav-list"></ul>
+          </aside>
+          <main class="articles-content">
+            <article id="article-content"></article>
+            <div class="comments-section">
+              <h3>Comments</h3>
+              <ul id="comments-list"></ul>
+              <textarea id="comment-input" placeholder="Add a comment..."></textarea>
+              <button id="comment-submit" class="btn small">Submit</button>
+            </div>
+          </main>
+        </div>
       </div>
     <!-- Confetti container -->
     <div id="confetti"></div>

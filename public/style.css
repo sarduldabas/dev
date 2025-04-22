@@ -387,6 +387,105 @@ body.phrasal {
   overflow: hidden;
   z-index: 999;
 }
+/*---------------------------------------------
+  KPI Filters
+---------------------------------------------*/
+.kpi-filters {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.kpi-filter {
+  background: #ffffff;
+  border: 1px solid var(--color-primary);
+  color: var(--color-primary);
+  padding: 0.4rem 0.8rem;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.kpi-filter.active,
+.kpi-filter:hover {
+  background: var(--color-primary);
+  color: #ffffff;
+}
+
+/*---------------------------------------------
+  Articles Screen Layout
+---------------------------------------------*/
+.articles-container {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+  align-items: flex-start;
+}
+.articles-nav {
+  flex: 0 0 200px;
+  border-right: 1px solid #ddd;
+  padding-right: 1rem;
+}
+.articles-nav ul {
+  list-style: none;
+  padding: 0;
+}
+.articles-nav li {
+  margin-bottom: 0.5rem;
+  cursor: pointer;
+  color: var(--color-primary);
+}
+.articles-nav li.active {
+  font-weight: 600;
+}
+.articles-content {
+  flex: 1 1 auto;
+}
+.articles-content article {
+  margin-bottom: 1rem;
+}
+.comments-section {
+  background: #ffffff;
+  padding: 1rem;
+  border-radius: var(--radius);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+.comments-section h3 {
+  margin-bottom: 0.5rem;
+}
+.comments-section ul {
+  list-style: none;
+  padding: 0;
+  max-height: 150px;
+  overflow-y: auto;
+  margin-bottom: 0.5rem;
+}
+.comments-section li {
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 0.5rem;
+}
+.comments-section textarea {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: var(--radius);
+  margin-bottom: 0.5rem;
+  resize: vertical;
+}
+.comments-section button {
+  display: block;
+  align-self: flex-end;
+}
+@media (max-width: 600px) {
+  .articles-container {
+    flex-direction: column;
+  }
+  .articles-nav {
+    border-right: none;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 1rem;
+  }
+}
 @keyframes confetti-fall {
   0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
   100% { transform: translateY(100vh) rotate(360deg); opacity: 0; }
