@@ -195,9 +195,9 @@ app.post('/api/translate', upload.single('audio'), async (req, res, next) => {
     if (ext) {
       try { fs.renameSync(audioPath, audioPath + ext); audioPath += ext; } catch {};
     }
-    // Audio translation: use GPT-4o translate model
+    // Audio translation: use Whisper model for translation
     const translationResp = await retryRequest(() =>
-      openai.audio.translations.create({ file: fs.createReadStream(audioPath), model: 'gpt-4o-translate' })
+      openai.audio.translations.create({ file: fs.createReadStream(audioPath), model: 'whisper-1' })
     );
     const translation = translationResp.text.trim();
     // Cleanup
